@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-const ACTIONS: [(Action, &'static str); 7] = [
+pub const ACTIONS: [(Action, &'static str); 7] = [
     (Action::On, "on"),
     (Action::Off, "off"),
     (Action::Up, "up"),
