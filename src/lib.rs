@@ -50,7 +50,6 @@ impl Action {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Device {
     pub name: String,
-    pub ip: String,
     pub action: Action,
     pub available_actions: Vec<Action>,
     pub default_target: usize,
@@ -148,7 +147,6 @@ mod tests {
         use Action::*;
         let device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
@@ -160,7 +158,7 @@ mod tests {
 
         let jsoned = device.to_json();
 
-        let actual =  "{\"name\":\"Device1\",\"ip\":\"192.168.1.70\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"dutycycles\":[0,10,45,60,80,90],\"target\":2,\"period_ms\":100,\"on_duration_ms\":60}";
+        let actual =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"dutycycles\":[0,10,45,60,80,90],\"target\":2,\"period_ms\":100,\"on_duration_ms\":60}";
 
         assert_eq!(jsoned, actual);
     }
@@ -170,7 +168,6 @@ mod tests {
         use Action::*;
         let device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
@@ -180,7 +177,7 @@ mod tests {
             on_duration_ms: 60,
         };
 
-        let json =  "{\"name\":\"Device1\",\"ip\":\"192.168.1.70\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"dutycycles\":[0,10,45,60,80,90],\"target\":2,\"period_ms\":100,\"on_duration_ms\":60}";
+        let json =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"dutycycles\":[0,10,45,60,80,90],\"target\":2,\"period_ms\":100,\"on_duration_ms\":60}";
 
         let actual = Device::from_json(&json.to_string());
 
@@ -192,7 +189,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
@@ -214,7 +210,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
@@ -236,7 +231,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 5,
@@ -258,7 +252,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
@@ -280,7 +273,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
@@ -302,7 +294,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
@@ -324,7 +315,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
@@ -346,7 +336,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
@@ -368,7 +357,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
@@ -390,7 +378,6 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            ip: String::from("192.168.1.70"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
