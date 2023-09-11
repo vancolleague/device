@@ -49,15 +49,15 @@ impl Action {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Device {
-    name: String,
-    ip: String,
-    action: Action,
-    available_actions: Vec<Action>,
-    default_target: usize,
-    dutycycles: [usize; 6],
-    target: usize,
-    period_ms: usize,
-    on_duration_ms: usize,
+    pub name: String,
+    pub ip: String,
+    pub action: Action,
+    pub available_actions: Vec<Action>,
+    pub default_target: usize,
+    pub dutycycles: [usize; 6],
+    pub target: usize,
+    pub period_ms: usize,
+    pub on_duration_ms: usize,
 }
 
 impl Device {
