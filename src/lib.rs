@@ -126,7 +126,7 @@ impl Device {
     }
 
     fn update_on_duration_ms(&mut self) {
-        let duration = self.period_ms * self.dutycycles[self.target] / 100;
+        let duration = self.period_ms * (self.dutycycles[self.target] as u32) / 100;
         let percent = duration as f32 / self.period_ms as f32;
         self.on_duration_ms = if percent < 0.025 {
             0
@@ -210,7 +210,7 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            action: Action::Off,
+            action: Action::On,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
             dutycycles: [0, 10, 45, 60, 80, 90],
@@ -294,7 +294,7 @@ mod tests {
         use Action::*;
         let mut device = Device {
             name: String::from("Device1"),
-            action: Action::Off,
+            action: Action::On,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
             dutycycles: [0, 10, 45, 60, 80, 90],
