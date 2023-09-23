@@ -55,8 +55,8 @@ pub struct Device {
     pub default_target: usize,
     pub dutycycles: [usize; 6],
     pub target: usize,
-    pub period_ms: usize,
-    pub on_duration_ms: usize,
+    pub period_ms: u32,
+    pub on_duration_ms: u32,
 }
 
 impl Device {
