@@ -53,10 +53,9 @@ pub struct Device {
     pub action: Action,
     pub available_actions: Vec<Action>,
     pub default_target: usize,
-    pub dutycycles: [usize; 6],
+    pub duty_cycles: [u32; 6],
     pub target: usize,
-    pub period_ms: u32,
-    pub on_duration_ms: u32,
+    pub freq_kHz: u32,
 }
 
 impl Device {
@@ -85,15 +84,12 @@ impl Device {
         match action {
             On => {
                 self.target = self.default_target;
-                self.update_on_duration_ms();
             },
             Off => {
                 self.target = 0;
-                self.update_on_duration_ms();
             },
             Up => {
-                self.target = (self.target + 1).min(self.dutycycles.len() - 1);
-                self.update_on_duration_ms();
+                self.target = (self.target + 1).min(self.duty_cycles.len() - 1);
             }
             Down => {
                 self.target = if 1 < self.target {
@@ -101,40 +97,28 @@ impl Device {
                 } else {
                     0
                 };
-                self.update_on_duration_ms();
             },
             Min => {
                 self.target = 1;
-                self.update_on_duration_ms();
             },
             Max => {
-                self.target = self.dutycycles.len() - 1;
-                self.update_on_duration_ms();
+                self.target = self.duty_cycles.len() - 1;
             },
             Set => {
                 let target = target.ok_or("invalid target")?; 
-                self.target = if target > self.dutycycles.len() - 1  {
-                    self.dutycycles.len() - 1
+                self.target = if target > self.duty_cycles.len() - 1  {
+                    self.duty_cycles.len() - 1
                 } else {
                     target
                 };
-                self.update_on_duration_ms();
             },          
         }
         self.action = action;
         Ok(())
     }
 
-    fn update_on_duration_ms(&mut self) {
-        let duration = self.period_ms * (self.dutycycles[self.target] as u32) / 100;
-        let percent = duration as f32 / self.period_ms as f32;
-        self.on_duration_ms = if percent < 0.025 {
-            0
-        } else if 0.975 < percent {
-            self.period_ms
-        } else {
-            duration
-        }
+    pub fn get_duty_cycle(&self) -> u32 {
+        self.duty_cycles[self.target]
     }
 }
 
@@ -150,15 +134,14 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 2,
-            period_ms: 100,
-            on_duration_ms: 60,
+            freq_kHz: 10,
         };
 
         let jsoned = device.to_json();
 
-        let actual =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"dutycycles\":[0,10,45,60,80,90],\"target\":2,\"period_ms\":100,\"on_duration_ms\":60}";
+        let actual =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"duty_cycles\":[0,10,45,60,80,90],\"target\":2,\"freq_kHz\":10}";
 
         assert_eq!(jsoned, actual);
     }
@@ -171,13 +154,12 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 2,
-            period_ms: 100,
-            on_duration_ms: 60,
+            freq_kHz: 10,
         };
 
-        let json =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"dutycycles\":[0,10,45,60,80,90],\"target\":2,\"period_ms\":100,\"on_duration_ms\":60}";
+        let json =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"duty_cycles\":[0,10,45,60,80,90],\"target\":2,\"freq_kHz\":10}";
 
         let actual = Device::from_json(&json.to_string());
 
@@ -192,16 +174,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 2,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(On, None);
 
         assert_eq!(device.target, 3);
-        assert_eq!(device.on_duration_ms, 66);
+        assert_eq!(device.get_duty_cycle(), 60);
         assert_eq!(device.action, On);
     }
     
@@ -213,16 +194,15 @@ mod tests {
             action: Action::On,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 2,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Off, None);
 
         assert_eq!(device.target, 0);
-        assert_eq!(device.on_duration_ms, 0);
+        assert_eq!(device.get_duty_cycle(), 0);
         assert_eq!(device.action, Off);
     }
 
@@ -234,16 +214,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 5,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 2,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Up, None);
 
         assert_eq!(device.target, 3);
-        assert_eq!(device.on_duration_ms, 66);
+        assert_eq!(device.get_duty_cycle(), 60);
         assert_eq!(device.action, Up);
     }
 
@@ -255,16 +234,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 3,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 5,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Up, None);
 
         assert_eq!(device.target, 5);
-        assert_eq!(device.on_duration_ms, 99);
+        assert_eq!(device.get_duty_cycle(), 90);
         assert_eq!(device.action, Up);
     }
 
@@ -276,16 +254,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 5,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Down, None);
 
         assert_eq!(device.target, 4);
-        assert_eq!(device.on_duration_ms, 88);
+        assert_eq!(device.get_duty_cycle(), 80);
         assert_eq!(device.action, Down);
     }
 
@@ -297,16 +274,15 @@ mod tests {
             action: Action::On,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 0,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Down, None);
 
         assert_eq!(device.target, 0);
-        assert_eq!(device.on_duration_ms, 0);
+        assert_eq!(device.get_duty_cycle(), 0);
         assert_eq!(device.action, Down);
     }
 
@@ -318,16 +294,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 3,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Min, None);
 
         assert_eq!(device.target, 1);
-        assert_eq!(device.on_duration_ms, 11);
+        assert_eq!(device.get_duty_cycle(), 10);
         assert_eq!(device.action, Min);
     }
 
@@ -339,16 +314,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 3,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Max, None);
 
         assert_eq!(device.target, 5);
-        assert_eq!(device.on_duration_ms, 99);
+        assert_eq!(device.get_duty_cycle(), 90);
         assert_eq!(device.action, Max);
     }
 
@@ -360,16 +334,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 3,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Set, Some(5));
 
         assert_eq!(device.target, 5);
-        assert_eq!(device.on_duration_ms, 99);
+        assert_eq!(device.get_duty_cycle(), 90);
         assert_eq!(device.action, Set);
     }
 
@@ -381,16 +354,15 @@ mod tests {
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
             default_target: 2,
-            dutycycles: [0, 10, 45, 60, 80, 90],
+            duty_cycles: [0, 10, 45, 60, 80, 90],
             target: 3,
-            period_ms: 110,
-            on_duration_ms: 60,
+            freq_kHz: 110,
         };
 
         device.take_action(Set, Some(6));
 
         assert_eq!(device.target, 5);
-        assert_eq!(device.on_duration_ms, 99);
+        assert_eq!(device.get_duty_cycle(), 90);
         assert_eq!(device.action, Set);
     }
 }
