@@ -64,7 +64,7 @@ impl Device {
         match device {
             Ok(d) => Ok(d),
             Err(e) => {
-                println!("000000000000 {}", e.as_str());
+                println!("000000000000 {}", e.to_string().as_str());
                 Err("Could not convert Device to json")
             }
         }
