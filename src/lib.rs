@@ -55,7 +55,7 @@ pub struct Device {
     pub action: Action,
     pub available_actions: Vec<Action>,
     pub default_target: usize,
-    pub duty_cycles: [u32; 6],
+    pub duty_cycles: [u32; 8],
     pub target: usize,
     pub freq_Hz: u32,
 }
