@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+use esp-idf-hal::unites::Hertz;
+
 const ACTIONS: [(Action, &'static str); 7] = [
     (Action::On, "on"),
     (Action::Off, "off"),
@@ -55,7 +57,7 @@ pub struct Device {
     pub default_target: usize,
     pub duty_cycles: [u32; 6],
     pub target: usize,
-    pub freq_kHz: u32,
+    pub freq: Hertz,
 }
 
 impl Device {
