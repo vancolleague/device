@@ -63,8 +63,10 @@ impl Device {
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
             Ok(d) => Ok(d),
-//            Err(e) => Err(format!("{}: couldn't deserialize device json", e.clone()).as_str())
-            Err(e) => Err(e.to_string().clone().as_str()),
+            Err(e) => {
+                println!("000000000000 {}", e.as_str());
+                Err("Could not convert Device to json")
+            }
         }
     }
 
