@@ -64,7 +64,7 @@ impl Device {
         match device {
             Ok(d) => Ok(d),
 //            Err(e) => Err(format!("{}: couldn't deserialize device json", e.clone()).as_str())
-            Err(e) => e,
+            Err(e) => Err(e.to_string()),
         }
     }
 
