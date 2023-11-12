@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use esp_idf_hal::unites::Hertz;
+use esp_idf_hal::units::Hertz;
 
 const ACTIONS: [(Action, &'static str); 7] = [
     (Action::On, "on"),
