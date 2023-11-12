@@ -57,7 +57,7 @@ pub struct Device {
     pub default_target: usize,
     pub duty_cycles: [u32; 6],
     pub target: usize,
-    pub freq_Hz: usize,
+    pub freq_Hz: u32,
 }
 
 impl Device {
