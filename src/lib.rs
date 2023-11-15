@@ -118,6 +118,7 @@ impl Device {
             },          
         }
         self.action = action;
+        self.updated = true;
         Ok(())
     }
 
