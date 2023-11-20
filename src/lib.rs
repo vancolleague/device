@@ -26,6 +26,8 @@ pub enum Action {
 
 impl Action {
     pub fn from_str(s: &str) -> Result<Self, &str> {
+        let s = s.to_lowercase().as_str();
+        
         let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(d, s)| (*s, *d)).collect();
 
         for (key, &value) in action_set.iter() {
