@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-const ACTIONS: [(Action, &'static str); 7] = [
-    (Action::On, "on"),
-    (Action::Off, "off"),
-    (Action::Up, "up"),
-    (Action::Down, "down"),
-    (Action::Min, "min"),
-    (Action::Max, "max"),
-    (Action::Set, "set"),
+const ACTIONS: [(Action, &'static str, &'static str); 7] = [
+    (Action::On, "on", "on"),
+    (Action::Off, "off", "of"),
+    (Action::Up, "up", "up"),
+    (Action::Down, "down", "dn"),
+    (Action::Min, "minimum", "mn"),
+    (Action::Max, "maximum", "mx"),
+    (Action::Set, "set", "st"),
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -28,7 +28,21 @@ impl Action {
     pub fn from_str(s: &str) -> Result<Self, &str> {
         let s = s.to_lowercase();
         
-        let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(d, s)| (*s, *d)).collect();
+        let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(d, s, _)| (*s, *d)).collect();
+
+        for (key, &value) in action_set.iter() {
+            if s.starts_with(key) {
+                return Ok(value)
+            }
+        }
+
+        Err("Bad Action name given")
+    }
+
+    pub fn from_str_abbr(s: &str) -> Result<Self, &str> {
+        let s = s.to_lowercase();
+        
+        let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(d, _, s)| (*s, *d)).collect();
 
         for (key, &value) in action_set.iter() {
             if s.starts_with(key) {
