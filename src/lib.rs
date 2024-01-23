@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bluer::Uuid;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
@@ -371,6 +372,7 @@ mod tests {
     fn take_action_set_high() {
         use Action::*;
         let mut device = Device {
+            uuid: Uuid,
             name: String::from("Device1"),
             action: Action::Off,
             available_actions: Vec::from([On, Off, Min, Max]),
