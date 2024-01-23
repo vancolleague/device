@@ -66,6 +66,7 @@ impl Action {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Device {
+    pub uuid: Uuid,
     pub name: String,
     pub action: Action,
     pub available_actions: Vec<Action>,
