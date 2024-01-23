@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bluer::Uuid;
+use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
