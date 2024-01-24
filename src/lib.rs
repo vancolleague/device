@@ -4,14 +4,15 @@ use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-const ACTIONS: [(Action, &'static str, &'static str); 7] = [
-    (Action::On, "on", "on"),
-    (Action::Off, "off", "of"),
-    (Action::Up, "up", "up"),
-    (Action::Down, "down", "dn"),
-    (Action::Min, "minimum", "mn"),
-    (Action::Max, "maximum", "mx"),
-    (Action::Set, "set", "st"),
+const ACTIONS: [(Action, &'static str, u128); 8] = [
+    (Action::On, "on", 0x928e9b929939486b998d69613f89a9a6),
+    (Action::Off, "off", 0x13df417d74d2443b87e3de60557b75b8),
+    (Action::Up, "up", 0xbc6c6eeba0ba40e0a57ff5186d4350ce),
+    (Action::Down, "down", 0x62865402c86245eea282d4f2ca8fd51b),
+    (Action::Min, "minimum", 0x4aad1b26ea9b455190d0d917102b7f36),
+    (Action::Max, "maximum", 0x4ffb631fa4ba4fb5a189f7a3bb9dfa01),
+    (Action::Reverse, "reverse", 0xa201801c1cbe4c918873c04486d3208b),
+    (Action::Set, "set", 0x2a4fae8107134e1fa8187ac56e4f13e4),
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -22,6 +23,7 @@ pub enum Action {
     Down,
     Min,
     Max,
+    Reverse,
     Set,
 }
 
@@ -40,20 +42,6 @@ impl Action {
         Err("Bad Action name given")
     }
 
-    pub fn from_str_abbr(s: &str) -> Result<Self, &str> {
-        let s = s.to_lowercase();
-        
-        let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(d, _, s)| (*s, *d)).collect();
-
-        for (key, &value) in action_set.iter() {
-            if s.starts_with(key) {
-                return Ok(value)
-            }
-        }
-
-        Err("Bad Action name given")
-    }
-
     pub fn to_str(&self) -> &str {
         for a in ACTIONS {
             if a.0 == *self {
@@ -61,6 +49,24 @@ impl Action {
             }
         }
         ""
+    }
+
+    pub fn from_u128(&self, num: u128) -> Result<Self, &str> {
+        for (a, _, n) in ACTIONS.iter() {
+            if *n == num {
+                return Ok(a.clone());
+            }
+        }
+        Err("Bad Uuid number given, no associated action")
+    }
+
+    pub fn to_uuid(&self) -> Uuid {
+        for (a, _, n) in ACTIONS.iter() {
+            if a == self {
+                return Uuid::from_u128(n)
+            }
+        }
+        Uuid::from_u128(1)
     }
 }
 
@@ -74,6 +80,7 @@ pub struct Device {
     pub duty_cycles: [u32; 8],
     pub target: usize,
     pub freq_Hz: u32,
+    pub reversed: bool,
     pub updated: bool,
 }
 
@@ -125,6 +132,9 @@ impl Device {
             },
             Max => {
                 self.target = self.duty_cycles.len() - 1;
+            },
+            Reverse => {
+                self.reversed = !self.reversed;
             },
             Set => {
                 let target = target.ok_or("invalid target")?; 
