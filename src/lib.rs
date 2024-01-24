@@ -63,7 +63,7 @@ impl Action {
     pub fn to_uuid(&self) -> Uuid {
         for (a, _, n) in ACTIONS.iter() {
             if a == self {
-                return Uuid::from_u128(n)
+                return Uuid::from_u128(n.clone())
             }
         }
         Uuid::from_u128(1)
