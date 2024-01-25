@@ -12,7 +12,7 @@ const ACTIONS: [(Action, &'static str, u128); 8] = [
     (Action::Min, "minimum", 0x4aad1b26ea9b455190d0d917102b7f36),
     (Action::Max, "maximum", 0x4ffb631fa4ba4fb5a189f7a3bb9dfa01),
     (Action::Reverse, "reverse", 0xa201801c1cbe4c918873c04486d3208b),
-    (Action::Set, "set", 0x2a4fae8107134e1fa8187ac56e4f13e4),
+    (Action::Set { target: 0 }, "set", 0x2a4fae8107134e1fa8187ac56e4f13e4),
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -24,7 +24,7 @@ pub enum Action {
     Min,
     Max,
     Reverse,
-    Set,
+    Set { target: usize },
 }
 
 impl Action {
