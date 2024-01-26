@@ -28,10 +28,14 @@ pub enum Action {
 }
 
 impl Action {
-    pub fn from_str(s: &str) -> Result<Self, &str> {
+    pub fn from_str(s: &str, target: Option<usize>) -> Result<Self, &'static str> {
         let s = s.to_lowercase();
-        
-        let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(d, s, _)| (*s, *d)).collect();
+       
+        if s == "set" && target.is_some() {
+            return Ok(Action::Set { target: target.unwrap() })
+        }
+
+        let action_set: HashMap<&str, Action> = ACTIONS.iter().map(|(a, t, _)| (*t, *a)).collect();
 
         for (key, &value) in action_set.iter() {
             if s.starts_with(key) {
@@ -51,12 +55,22 @@ impl Action {
         ""
     }
 
-    pub fn from_u128(&self, num: u128) -> Result<Self, &str> {
+    pub fn from_u128(num: u128, target: Option<usize>) -> Result<Self, &'static str> {
+        if ACTIONS[7].2 == num && target.is_some() {
+            let target = target.unwrap();
+            if target > 7 {
+                return Err("Target is too large")
+            } else {
+                return Ok(Action::Set { target: target })
+            }
+        }
+
         for (a, _, n) in ACTIONS.iter() {
             if *n == num {
                 return Ok(a.clone());
             }
         }
+
         Err("Bad Uuid number given, no associated action")
     }
 
@@ -67,6 +81,13 @@ impl Action {
             }
         }
         Uuid::from_u128(1)
+    }
+
+    pub fn get_target(&self) -> Option<usize> {
+        match self {
+            Action::Set{ target: a } => Some(a.clone()),
+            _ => None,
+        }
     }
 }
 
