@@ -126,7 +126,7 @@ impl Device {
         }
     }
 
-    pub fn take_action(&mut self, action: Action, target: Option<usize>) -> Result<(), &'static str>{
+    pub fn take_action(&mut self, action: Action) -> Result<(), &'static str>{
         if !self.available_actions.contains(&self.action) {
             return Err("Action not available for device")
         }
@@ -158,7 +158,8 @@ impl Device {
                 self.reversed = !self.reversed;
             },
             Set => {
-                let target = target.ok_or("invalid target")?; 
+                let target = action.get_target().unwrap();
+                //let target = target.ok_or("invalid target")?; 
                 self.target = if target > self.duty_cycles.len() - 1  {
                     self.duty_cycles.len() - 1
                 } else {
