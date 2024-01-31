@@ -142,9 +142,20 @@ impl Device {
     }
 
     pub fn take_action(&mut self, action: Action) -> Result<(), &'static str> {
-        if !self.available_actions.contains(&self.action) {
+        if let Action::Set { .. } = action {
+            let mut set_present = false;
+            for a in self.available_actions.iter() {
+                if let Action::Set { .. } = a {
+                    set_present = true;
+                }
+            }
+            if !set_present {
+                return Err("Action not available for device");
+            }
+        } else if !self.available_actions.contains(&self.action) {
             return Err("Action not available for device");
         }
+
         use Action::*;
         match action {
             On => {
@@ -168,9 +179,8 @@ impl Device {
             Reverse => {
                 self.reversed = !self.reversed;
             }
-            Set => {
+            Set { .. } => {
                 let target = action.get_target().unwrap();
-                //let target = target.ok_or("invalid target")?;
                 self.target = if target > self.duty_cycles.len() - 1 {
                     self.duty_cycles.len() - 1
                 } else {
