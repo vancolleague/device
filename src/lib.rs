@@ -4,6 +4,21 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use uuid::Uuid;
 
+const DEVICE_TYPES: [(DeviceType, &'static str, u128); 2] = [
+    (
+        DeviceType::Light,
+        "lights",
+        0xf1d34301c91642a88c7c274828177649,
+    ),
+    (DeviceType::Fan, "fans", 0x3d39295fb06842ecabeed69e0d65c105),
+];
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub enum DeviceType {
+    Light,
+    Fan,
+}
+
 const ACTIONS: [(Action, &'static str, u128); 8] = [
     (Action::On, "on", 0x928e9b929939486b998d69613f89a9a6),
     (Action::Off, "off", 0x13df417d74d2443b87e3de60557b75b8),
@@ -116,6 +131,7 @@ pub struct Device {
     pub duty_cycles: [u32; 8],
     pub target: usize,
     pub freq_Hz: u32,
+    pub device_type: Option<DeviceType>,
     pub reversed: bool,
     pub updated: bool,
 }
