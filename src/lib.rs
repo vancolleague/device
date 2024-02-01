@@ -152,10 +152,9 @@ impl Device {
             if !set_present {
                 return Err("Action not available for device");
             }
-        } else if !self.available_actions.contains(&self.action) {
+        } else if !self.available_actions.contains(&action) {
             return Err("Action not available for device");
         }
-
         use Action::*;
         match action {
             On => {
