@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use uuid::Uuid;
 
-const DEVICE_TYPES: [(DeviceType, &'static str, u128); 2] = [
+pub const DEVICE_TYPES: [(DeviceType, &'static str, u128); 2] = [
     (
         DeviceType::Light,
         "lights",
