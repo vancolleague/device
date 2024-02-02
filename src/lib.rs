@@ -4,19 +4,21 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use uuid::Uuid;
 
-pub const DEVICE_TYPES: [(DeviceType, &'static str, u128); 2] = [
+pub const DEVICE_TYPES: [(DeviceType, &'static str, u128); 3] = [
     (
         DeviceType::Light,
         "lights",
         0xf1d34301c91642a88c7c274828177649,
     ),
     (DeviceType::Fan, "fans", 0x3d39295fb06842ecabeed69e0d65c105),
+    (DeviceType::Generic, "generic", 0x36715f57d8c6400d91f403cc1f20c793),
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum DeviceType {
     Light,
     Fan,
+    Generic,
 }
 
 const ACTIONS: [(Action, &'static str, u128); 8] = [
@@ -120,23 +122,175 @@ impl Action {
         }
     }
 }
-
+/// Represents a device on a node
+///
+/// While custom behaviors can be generated, its assumed to control a PWM based device. The
+/// available duty cycles are stored in 'duty_cycles' which is the percent of the time that device
+/// will be on. 'target' specifiies which duty cycle is currently selected. Actions control the
+/// selection of targets/duty cycles. 
+///
+/// # Examples
+///
+/// ```
+/// let device = Device::new("fan", Uuid::from_u128(0xf1d34301c91642a88c7c274828177649));
+/// println!("Device: {:?}", device);
+/// `
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Device {
+    /// Unique identifier for the device.
+    ///
+    /// This field must be supplied when creating a new 'Device' and does not have a default value
     pub uuid: Uuid,
+    /// A human-readable name for the device.
+    ///
+    /// This field must be supplied when creating a new 'Device' and does not have a default value.
+    /// It must also have a unique value on the network.
     pub name: String,
+    /// What the device is about to do or last did. Optional
+    ///
+    /// Defaults to 'Off'. Can be set using 'with_action'.
     pub action: Action,
+    /// What the device can do, valid values for 'Action'. Optional
+    ///
+    /// Defaults to Vec::from([On, Off, Up, Down, Min, Max, Set { target: 0 },]).
+    /// Can be set using 'with_available_actions'
     pub available_actions: Vec<Action>,
+    /// The default 'target', to be used in conjunction with the 'On' 'Action'.
+    ///
+    /// Defaults to 3. Must be <= 7. Can be set using 'with_default_target'.
     pub default_target: usize,
+    /// The array of duty cycles that are targetable by the device.
+    ///
+    /// Devaults to [0, 2, 4, 8, 16, 32, 64, 96]. 100 can cause problems for some hardware.
+    /// Must be exactly 8 cells long and each cell must be in the inclusive range of 0 though 100. Can be set using 'with_duty_cycles'
     pub duty_cycles: [u32; 8],
+    /// The index of the duty cycle from the 'duty_cycles' array that's currently to be targetted.
+    ///
+    /// Defaults to 3. Must by in the inclusive 0 to 7 range. Can be set using 'with_target'.
     pub target: usize,
+    /// The frequency that the PWM will operate at in Hz.
+    ///
+    /// Defaults to 1000. Can be set using 'with_freq_Hz'.
     pub freq_Hz: u32,
-    pub device_type: Option<DeviceType>,
+    /// The type of device, used for addressing groups of devices such as lights or fans.
+    ///
+    /// Defaults to Generic which is meant to be used for devices that aren't to be grouped. Can be
+    /// set using 'with_device_type'.
+    pub device_type: DeviceType,
+    /// Used for controlling the directon of reversable devices.
+    ///
+    /// Could be used for the direction of a fan or Heat vs. Cool in an HVAC system.
+    ///
+    /// Defaults to 'false'. Can be set using 'with_reversed'.
     pub reversed: bool,
+    /// Used for tracking when updates have been made to a devices state for the sake of ttrigering
+    /// other changes.
+    ///
+    /// Can be used to signify when things such as PWM duty cycles must be updated.
+    ///
+    /// Defaults to 'true', this can be used to set initial configurations of underlying hardware.
+    /// Can be set using 'with_updated'.
     pub updated: bool,
 }
 
 impl Device {
+    /// Constructs a new 'Device' with the given 'uuid' and 'name'.
+    /// All other properties are optional and will be filled with defaults unless relevent
+    /// functions are used.
+    pub fn new(uuid: Uuid, name: String) -> Self {
+        Self {
+            uuid,
+            name,
+            action: Action::Off,
+            available_actions: Vec::from([
+                Action::On,
+                Action::Off,
+                Action::Up,
+                Action::Down,
+                Action::Min,
+                Action::Max,
+                Action::Set { target: 0 },
+            ]),
+            default_target: 3,
+            duty_cycles: [0, 2, 4, 8, 16, 32, 64, 96],
+            target: 0,
+            freq_Hz: 1000,
+            device_type: DeviceType::Generic,
+            reversed: false,
+            updated: true,
+        }
+    }
+
+    /// Sets the action of this Device
+    pub fn with_action(mut self, action: Action) -> Self {
+        self.action = action;
+        self
+    }
+
+    /// Sets the available_actions of this Device
+    pub fn with_available_actions(mut self, available_actions: Vec<Action>) -> Self {
+        self.available_actions = available_actions;
+        self
+    }
+
+    /// Sets the default_target of this Device
+    pub fn with_default_target(mut self, default_target: usize) -> Self {
+        if default_target > 7 {
+            panic!("default_target must be less than 8");
+        }
+        self.default_target = default_target;
+        self
+    }
+
+    /// Sets the duty_cycles of this Device
+    pub fn with_duty_cycles(mut self, duty_cycles: [u32; 8]) -> Self {
+        if duty_cycles.len() != 8 {
+            panic!("duty_cycles must be exactly 8 long.");
+        }
+        for v in duty_cycles.iter() {
+            if v > &100 {
+                panic!("duty_cycles must each be less than or equal to 100.");
+            }
+        }
+
+        self.duty_cycles = duty_cycles;
+        self
+    }
+
+    /// Sets the target of this Device
+    pub fn with_target(mut self, target: usize) -> Self {
+        if target > 7 {
+            panic!("target must be less than 8.");
+        }
+
+        self.target = target;
+        self
+    }
+
+    /// Sets the freq_Hz of this Device
+    pub fn with_freq_Hz(mut self, freq_Hz: u32) -> Self {
+        self.freq_Hz = freq_Hz;
+        self
+    }
+
+    /// Sets the device_type of this Device
+    pub fn with_device_type(mut self, device_type: DeviceType) -> Self {
+        self.device_type = device_type;
+        self
+    }
+
+    /// Sets the reversed of this Device
+    pub fn with_reversed(mut self, reversed: bool) -> Self {
+        self.reversed = reversed;
+        self
+    }
+
+    /// Sets the updated of this Device
+    pub fn with_updated(mut self, updated: bool) -> Self {
+        self.updated = updated;
+        self
+    }
+
     pub fn from_json(json: &String) -> Result<Self, &'static str> {
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
