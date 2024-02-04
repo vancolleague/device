@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::default::Default;
 
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -193,11 +194,37 @@ pub struct Device {
     pub updated: bool,
 }
 
+impl Default for Device {
+    fn default() -> Self {
+        Self {
+            uuid: Uuid::from_u128(0x0),
+            name: "".to_string(),
+            action: Action::Off,
+            available_actions: Vec::from([
+                Action::On,
+                Action::Off,
+                Action::Up,
+                Action::Down,
+                Action::Min,
+                Action::Max,
+                Action::Set { target: 0 },
+            ]),
+            default_target: 3,
+            duty_cycles: [0, 2, 4, 8, 16, 32, 64, 96],
+            target: 0,
+            freq_Hz: 1000,
+            device_type: DeviceType::Generic,
+            reversed: false,
+            updated: true,
+        }
+    }
+}
+
 impl Device {
     /// Constructs a new 'Device' with the given 'uuid' and 'name'.
     /// All other properties are optional and will be filled with defaults unless relevent
     /// functions are used.
-    pub fn new(uuid: Uuid, name: String) -> Self {
+    fn new(uuid: Uuid, name: String, action: Action, available_actions: Vec<Action>, default_target: usize, duty_cycles: [u32; 8], target: usize, freq_kHz: u32, device_type: DeviceType, reversed: bool, updated: bool) -> Self {
         Self {
             uuid,
             name,
@@ -221,20 +248,20 @@ impl Device {
         }
     }
 
-    /// Sets the action of this Device
-    pub fn with_action(mut self, action: Action) -> Self {
+/*    /// Sets the action of this Device
+    fn action(mut self, action: Action) -> Self {
         self.action = action;
         self
     }
 
     /// Sets the available_actions of this Device
-    pub fn with_available_actions(mut self, available_actions: Vec<Action>) -> Self {
+    fn available_actions(mut self, available_actions: Vec<Action>) -> Self {
         self.available_actions = available_actions;
         self
     }
 
     /// Sets the default_target of this Device
-    pub fn with_default_target(mut self, default_target: usize) -> Self {
+    fn default_target(mut self, default_target: usize) -> Self {
         if default_target > 7 {
             panic!("default_target must be less than 8");
         }
@@ -243,7 +270,7 @@ impl Device {
     }
 
     /// Sets the duty_cycles of this Device
-    pub fn with_duty_cycles(mut self, duty_cycles: [u32; 8]) -> Self {
+    fn duty_cycles(mut self, duty_cycles: [u32; 8]) -> Self {
         if duty_cycles.len() != 8 {
             panic!("duty_cycles must be exactly 8 long.");
         }
@@ -258,7 +285,7 @@ impl Device {
     }
 
     /// Sets the target of this Device
-    pub fn with_target(mut self, target: usize) -> Self {
+    fn target(mut self, target: usize) -> Self {
         if target > 7 {
             panic!("target must be less than 8.");
         }
@@ -268,29 +295,33 @@ impl Device {
     }
 
     /// Sets the freq_Hz of this Device
-    pub fn with_freq_Hz(mut self, freq_Hz: u32) -> Self {
+    fn freq_Hz(mut self, freq_Hz: u32) -> Self {
         self.freq_Hz = freq_Hz;
         self
     }
 
     /// Sets the device_type of this Device
-    pub fn with_device_type(mut self, device_type: DeviceType) -> Self {
+    fn device_type(mut self, device_type: DeviceType) -> Self {
         self.device_type = device_type;
         self
     }
 
     /// Sets the reversed of this Device
-    pub fn with_reversed(mut self, reversed: bool) -> Self {
+    fn reversed(mut self, reversed: bool) -> Self {
         self.reversed = reversed;
         self
     }
 
     /// Sets the updated of this Device
-    pub fn with_updated(mut self, updated: bool) -> Self {
+    fn updated(mut self, updated: bool) -> Self {
         self.updated = updated;
         self
     }
 
+    fn build(mut self) -> Self {
+
+    }
+*/
     pub fn from_json(json: &String) -> Result<Self, &'static str> {
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
