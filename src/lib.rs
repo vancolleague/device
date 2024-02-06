@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use uuid::Uuid;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub enum Behavior {
+    OnOff,
+    ReversableOnOff,
+    Slider,
+    ReversableSlider,
+}
+
 pub const DEVICE_TYPES: [(DeviceType, &'static str, u128); 3] = [
     (
         DeviceType::Light,
@@ -12,7 +20,11 @@ pub const DEVICE_TYPES: [(DeviceType, &'static str, u128); 3] = [
         0xf1d34301c91642a88c7c274828177649,
     ),
     (DeviceType::Fan, "fans", 0x3d39295fb06842ecabeed69e0d65c105),
-    (DeviceType::Generic, "generic", 0x36715f57d8c6400d91f403cc1f20c793),
+    (
+        DeviceType::Generic,
+        "generic",
+        0x36715f57d8c6400d91f403cc1f20c793,
+    ),
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -128,7 +140,7 @@ impl Action {
 /// While custom behaviors can be generated, its assumed to control a PWM based device. The
 /// available duty cycles are stored in 'duty_cycles' which is the percent of the time that device
 /// will be on. 'target' specifiies which duty cycle is currently selected. Actions control the
-/// selection of targets/duty cycles. 
+/// selection of targets/duty cycles.
 ///
 /// # Examples
 ///
@@ -192,6 +204,7 @@ pub struct Device {
     /// Defaults to 'true', this can be used to set initial configurations of underlying hardware.
     /// Can be set using 'with_updated'.
     pub updated: bool,
+    pub behavior: Behavior,
 }
 
 impl Default for Device {
@@ -216,6 +229,7 @@ impl Default for Device {
             device_type: DeviceType::Generic,
             reversed: false,
             updated: true,
+            behavior: Behavior::Slider,
         }
     }
 }
@@ -224,7 +238,19 @@ impl Device {
     /// Constructs a new 'Device' with the given 'uuid' and 'name'.
     /// All other properties are optional and will be filled with defaults unless relevent
     /// functions are used.
-    fn new(uuid: Uuid, name: String, action: Action, available_actions: Vec<Action>, default_target: usize, duty_cycles: [u32; 8], target: usize, freq_kHz: u32, device_type: DeviceType, reversed: bool, updated: bool) -> Self {
+    fn new(
+        uuid: Uuid,
+        name: String,
+        action: Action,
+        available_actions: Vec<Action>,
+        default_target: usize,
+        duty_cycles: [u32; 8],
+        target: usize,
+        freq_kHz: u32,
+        device_type: DeviceType,
+        reversed: bool,
+        updated: bool,
+    ) -> Self {
         Self {
             uuid,
             name,
@@ -245,83 +271,84 @@ impl Device {
             device_type: DeviceType::Generic,
             reversed: false,
             updated: true,
+            behavior: Behavior::Slider,
         }
     }
 
-/*    /// Sets the action of this Device
-    fn action(mut self, action: Action) -> Self {
-        self.action = action;
-        self
-    }
-
-    /// Sets the available_actions of this Device
-    fn available_actions(mut self, available_actions: Vec<Action>) -> Self {
-        self.available_actions = available_actions;
-        self
-    }
-
-    /// Sets the default_target of this Device
-    fn default_target(mut self, default_target: usize) -> Self {
-        if default_target > 7 {
-            panic!("default_target must be less than 8");
+    /*    /// Sets the action of this Device
+        fn action(mut self, action: Action) -> Self {
+            self.action = action;
+            self
         }
-        self.default_target = default_target;
-        self
-    }
 
-    /// Sets the duty_cycles of this Device
-    fn duty_cycles(mut self, duty_cycles: [u32; 8]) -> Self {
-        if duty_cycles.len() != 8 {
-            panic!("duty_cycles must be exactly 8 long.");
+        /// Sets the available_actions of this Device
+        fn available_actions(mut self, available_actions: Vec<Action>) -> Self {
+            self.available_actions = available_actions;
+            self
         }
-        for v in duty_cycles.iter() {
-            if v > &100 {
-                panic!("duty_cycles must each be less than or equal to 100.");
+
+        /// Sets the default_target of this Device
+        fn default_target(mut self, default_target: usize) -> Self {
+            if default_target > 7 {
+                panic!("default_target must be less than 8");
             }
+            self.default_target = default_target;
+            self
         }
 
-        self.duty_cycles = duty_cycles;
-        self
-    }
+        /// Sets the duty_cycles of this Device
+        fn duty_cycles(mut self, duty_cycles: [u32; 8]) -> Self {
+            if duty_cycles.len() != 8 {
+                panic!("duty_cycles must be exactly 8 long.");
+            }
+            for v in duty_cycles.iter() {
+                if v > &100 {
+                    panic!("duty_cycles must each be less than or equal to 100.");
+                }
+            }
 
-    /// Sets the target of this Device
-    fn target(mut self, target: usize) -> Self {
-        if target > 7 {
-            panic!("target must be less than 8.");
+            self.duty_cycles = duty_cycles;
+            self
         }
 
-        self.target = target;
-        self
-    }
+        /// Sets the target of this Device
+        fn target(mut self, target: usize) -> Self {
+            if target > 7 {
+                panic!("target must be less than 8.");
+            }
 
-    /// Sets the freq_Hz of this Device
-    fn freq_Hz(mut self, freq_Hz: u32) -> Self {
-        self.freq_Hz = freq_Hz;
-        self
-    }
+            self.target = target;
+            self
+        }
 
-    /// Sets the device_type of this Device
-    fn device_type(mut self, device_type: DeviceType) -> Self {
-        self.device_type = device_type;
-        self
-    }
+        /// Sets the freq_Hz of this Device
+        fn freq_Hz(mut self, freq_Hz: u32) -> Self {
+            self.freq_Hz = freq_Hz;
+            self
+        }
 
-    /// Sets the reversed of this Device
-    fn reversed(mut self, reversed: bool) -> Self {
-        self.reversed = reversed;
-        self
-    }
+        /// Sets the device_type of this Device
+        fn device_type(mut self, device_type: DeviceType) -> Self {
+            self.device_type = device_type;
+            self
+        }
 
-    /// Sets the updated of this Device
-    fn updated(mut self, updated: bool) -> Self {
-        self.updated = updated;
-        self
-    }
+        /// Sets the reversed of this Device
+        fn reversed(mut self, reversed: bool) -> Self {
+            self.reversed = reversed;
+            self
+        }
 
-    fn build(mut self) -> Self {
+        /// Sets the updated of this Device
+        fn updated(mut self, updated: bool) -> Self {
+            self.updated = updated;
+            self
+        }
 
-    }
-*/
+        fn build(mut self) -> Self {
+
+        }
+    */
     pub fn from_json(json: &String) -> Result<Self, &'static str> {
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
