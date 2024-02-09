@@ -37,8 +37,16 @@ pub enum DeviceType {
 const ACTIONS: [(Action, &'static str, u128); 8] = [
     (Action::On, "on", 0x928e9b929939486b998d69613f89a9a6),
     (Action::Off, "off", 0x13df417d74d2443b87e3de60557b75b8),
-    (Action::Up, "up", 0xbc6c6eeba0ba40e0a57ff5186d4350ce),
-    (Action::Down, "down", 0x62865402c86245eea282d4f2ca8fd51b),
+    (
+        Action::Up { amount: None },
+        "up",
+        0xbc6c6eeba0ba40e0a57ff5186d4350ce,
+    ),
+    (
+        Action::Down { amount: None },
+        "down",
+        0x62865402c86245eea282d4f2ca8fd51b,
+    ),
     (Action::Min, "minimum", 0x4aad1b26ea9b455190d0d917102b7f36),
     (Action::Max, "maximum", 0x4ffb631fa4ba4fb5a189f7a3bb9dfa01),
     (
@@ -57,8 +65,8 @@ const ACTIONS: [(Action, &'static str, u128); 8] = [
 pub enum Action {
     On,
     Off,
-    Up,
-    Down,
+    Up { amount: Option<usize> },
+    Down { amount: Option<usize> },
     Min,
     Max,
     Reverse,
@@ -68,6 +76,14 @@ pub enum Action {
 impl Action {
     pub fn from_str(s: &str, target: Option<usize>) -> Result<Self, &'static str> {
         let s = s.to_lowercase();
+
+        if s == "up" {
+            return Ok(Action::Up { amount: target });
+        }
+
+        if s == "down" {
+            return Ok(Action::Down { amount: target });
+        }
 
         if s == "set" && target.is_some() {
             return Ok(Action::Set {
@@ -131,6 +147,14 @@ impl Action {
     pub fn get_target(&self) -> Option<usize> {
         match self {
             Action::Set { target: a } => Some(a.clone()),
+            _ => None,
+        }
+    }
+
+    fn get_amount(&self) -> Option<usize> {
+        match self {
+            Action::Up { amount: a } => a.clone(),
+            Action::Down { amount: a } => a.clone(),
             _ => None,
         }
     }
@@ -216,8 +240,8 @@ impl Default for Device {
             available_actions: Vec::from([
                 Action::On,
                 Action::Off,
-                Action::Up,
-                Action::Down,
+                Action::Up { amount: None },
+                Action::Down { amount: None },
                 Action::Min,
                 Action::Max,
                 Action::Set { target: 0 },
@@ -258,8 +282,8 @@ impl Device {
             available_actions: Vec::from([
                 Action::On,
                 Action::Off,
-                Action::Up,
-                Action::Down,
+                Action::Up { amount: None },
+                Action::Down { amount: None },
                 Action::Min,
                 Action::Max,
                 Action::Set { target: 0 },
@@ -275,80 +299,6 @@ impl Device {
         }
     }
 
-    /*    /// Sets the action of this Device
-        fn action(mut self, action: Action) -> Self {
-            self.action = action;
-            self
-        }
-
-        /// Sets the available_actions of this Device
-        fn available_actions(mut self, available_actions: Vec<Action>) -> Self {
-            self.available_actions = available_actions;
-            self
-        }
-
-        /// Sets the default_target of this Device
-        fn default_target(mut self, default_target: usize) -> Self {
-            if default_target > 7 {
-                panic!("default_target must be less than 8");
-            }
-            self.default_target = default_target;
-            self
-        }
-
-        /// Sets the duty_cycles of this Device
-        fn duty_cycles(mut self, duty_cycles: [u32; 8]) -> Self {
-            if duty_cycles.len() != 8 {
-                panic!("duty_cycles must be exactly 8 long.");
-            }
-            for v in duty_cycles.iter() {
-                if v > &100 {
-                    panic!("duty_cycles must each be less than or equal to 100.");
-                }
-            }
-
-            self.duty_cycles = duty_cycles;
-            self
-        }
-
-        /// Sets the target of this Device
-        fn target(mut self, target: usize) -> Self {
-            if target > 7 {
-                panic!("target must be less than 8.");
-            }
-
-            self.target = target;
-            self
-        }
-
-        /// Sets the freq_Hz of this Device
-        fn freq_Hz(mut self, freq_Hz: u32) -> Self {
-            self.freq_Hz = freq_Hz;
-            self
-        }
-
-        /// Sets the device_type of this Device
-        fn device_type(mut self, device_type: DeviceType) -> Self {
-            self.device_type = device_type;
-            self
-        }
-
-        /// Sets the reversed of this Device
-        fn reversed(mut self, reversed: bool) -> Self {
-            self.reversed = reversed;
-            self
-        }
-
-        /// Sets the updated of this Device
-        fn updated(mut self, updated: bool) -> Self {
-            self.updated = updated;
-            self
-        }
-
-        fn build(mut self) -> Self {
-
-        }
-    */
     pub fn from_json(json: &String) -> Result<Self, &'static str> {
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
@@ -392,10 +342,25 @@ impl Device {
                 self.target = 0;
             }
             Up => {
-                self.target = (self.target + 1).min(self.duty_cycles.len() - 1);
+                let amount = action.get_amount();
+                let amount = match amount {
+                    Some(a) => a,
+                    None => 0,
+                };
+                self.target = (self.target + amount).min(self.duty_cycles.len() - 1);
             }
             Down => {
-                self.target = if 1 < self.target { self.target - 1 } else { 0 };
+                let amount = action.get_amount();
+                let amount = match amount {
+                    Some(a) => a,
+                    None => 0,
+                };
+                // can't use the "Up" process because it'll underflow sometimes
+                self.target = if amount < self.target {
+                    self.target - amount
+                } else {
+                    0
+                };
             }
             Min => {
                 self.target = 1;
