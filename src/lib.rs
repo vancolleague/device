@@ -158,6 +158,15 @@ impl Action {
             _ => None,
         }
     }
+
+    pub fn get_target_or_amount(&self) -> Option<usize> {
+        match self {
+            Action::Up { amount: a } => a.clone(),
+            Action::Down { amount: a } => a.clone(),
+            Action::Set { target: a } => Some(a.clone()),
+            _ => None,
+        }
+    }
 }
 /// Represents a device on a node
 ///
