@@ -104,6 +104,8 @@ impl Action {
 
     pub fn to_str(&self) -> &str {
         match *self {
+            Action::Up{ .. } => "up",
+            Action::Down { .. } => "down",
             Action::Set { .. } => "set",
             _ => {
                 for a in ACTIONS {
