@@ -331,7 +331,27 @@ impl Device {
     }
 
     pub fn take_action(&mut self, action: Action) -> Result<(), &'static str> {
-        if let Action::Set { .. } = action {
+        if let Action::Up { .. } = action {
+            let mut up_present = false;
+            for a in self.available_actions.iter() {
+                if let Action::Up { .. } = a {
+                    up_present = true;
+                }
+            }
+            if !up_present {
+                return Err("Action not available for device");
+            }
+        } else if let Action::Down { .. } = action {
+            let mut down_present = false;
+            for a in self.available_actions.iter() {
+                if let Action::Down { .. } = a {
+                    down_present = true;
+                }
+            }
+            if !down_present {
+                return Err("Action not available for device");
+            }
+        } else if let Action::Set { .. } = action {
             let mut set_present = false;
             for a in self.available_actions.iter() {
                 if let Action::Set { .. } = a {
@@ -352,19 +372,19 @@ impl Device {
             Off => {
                 self.target = 0;
             }
-            Up => {
+            Up { .. } => {
                 let amount = action.get_amount();
                 let amount = match amount {
                     Some(a) => a,
-                    None => 0,
+                    None => 1,
                 };
                 self.target = (self.target + amount).min(self.duty_cycles.len() - 1);
             }
-            Down => {
+            Down { .. } => {
                 let amount = action.get_amount();
                 let amount = match amount {
                     Some(a) => a,
-                    None => 0,
+                    None => 1,
                 };
                 // can't use the "Up" process because it'll underflow sometimes
                 self.target = if amount < self.target {
