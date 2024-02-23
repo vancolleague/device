@@ -1,3 +1,5 @@
+#![feature(variant_count)]
+
 use std::collections::HashMap;
 use std::default::Default;
 use std::mem::discriminant;
@@ -47,11 +49,11 @@ pub const DEVICE_GROUPS: [DeviceSynonyms; 2] = [
         device_group: DeviceGroup::Fan,
         name: "fans",
         uuid_number: 0x3d39295fb06842ecabeed69e0d65c105,
-    }
+    },
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub enum DeviceGroup{
+pub enum DeviceGroup {
     Light,
     Fan,
 }
@@ -198,11 +200,11 @@ impl Action {
 /// # Examples
 ///
 /// ```
-/// let device = Device::new("fan", Uuid::from_u128(0xf1d34301c91642a88c7c274828177649));
+/// use device::Device;
+/// use uuid::Uuid;
+///
+/// let device = Device::new(Uuid::from_u128(0xf1d34301c91642a88c7c274828177649), "fan".to_string());
 /// println!("Device: {:?}", device);
-/// `
-/// could calculate max number of duty_cycles, check that they're in the right order, check that
-/// available actions Set has the right default value
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Device {
     /// Unique identifier for the device.
@@ -232,6 +234,7 @@ pub struct Device {
     /// Devaults to [0, 2, 4, 8, 16, 32, 64, 96]. 100 can cause problems for some hardware.
     /// Must be exactly 8 cells long and each cell must be in the inclusive range of 0 though 100. Can be set using 'with_duty_cycles'
     pub duty_cycles: [Option<u32>; 8],
+    pub max_duty_cycle_index: usize,
     /// The index of the duty cycle from the 'duty_cycles' array that's currently to be targetted.
     ///
     /// Defaults to 3. Must by in the inclusive 0 to 7 range. Can be set using 'with_target'.
@@ -262,6 +265,7 @@ pub struct Device {
     pub behavior: Behavior,
 }
 
+/*
 impl Default for Device {
     fn default() -> Self {
         Self {
@@ -288,25 +292,25 @@ impl Default for Device {
         }
     }
 }
+*/
 
 impl Device {
     /// Constructs a new 'Device' with the given 'uuid' and 'name'.
     /// All other properties are optional and will be filled with defaults unless relevent
     /// functions are used.
-    fn new(
-        uuid: Uuid,
-        name: String,
-        action: Action,
-        available_actions: Vec<Action>,
-        default_target: usize,
-        duty_cycles: [Option<u32>; 8],
-        target: usize,
-        freq_Hz: u32,
-        device_group: Option<DeviceGroup>,
-        reversed: bool,
-        updated: bool,
-        behavior: Behavior,
-    ) -> Self {
+    pub fn new(uuid: Uuid, name: String) -> Self {
+        let duty_cycles = [
+            Some(0),
+            Some(2),
+            Some(4),
+            Some(8),
+            Some(16),
+            Some(32),
+            Some(64),
+            Some(96),
+        ];
+        let max_duty_cycle_index = Self::get_max_duty_cycle_index(&duty_cycles);
+
         Self {
             uuid,
             name,
@@ -320,28 +324,127 @@ impl Device {
                 Action::Max,
                 Action::Set(0),
             ]),
-            default_target,
+            default_target: 3,
             duty_cycles,
-            target,
-            freq_Hz,
-            device_group,
-            reversed,
+            max_duty_cycle_index,
+            target: 0,
+            freq_Hz: 100,
+            device_group: None,
+            reversed: false,
             updated: true,
-            behavior,
+            behavior: Behavior::Slider,
         }
     }
 
-    fn get_max_usable_duty_cycle_index(&self) -> usize {
-        self.duty_cycles.iter().filter(|x| x.is_some()).count() - 1
+    pub fn action(mut self, action: Action) -> Self {
+        self.action = action;
+        self
+    }
+
+    pub fn available_actions(mut self, available_actions: Vec<Action>) -> Self {
+        use Action as A;
+        for action in available_actions.iter() {
+            match action {
+                A::Up(Some(_)) => {
+                    panic!("If Action::Up is an an available_action, it must be set to Action::Up(None)");
+                }
+                A::Down(Some(_)) => {
+                    panic!("If Action::Down is an an available_action, it must be set to Action::Down(None)");
+                }
+                A::Set(v) => {
+                    if v != &0 {
+                        panic!("If Action::Set is an an available_action, it must be set to Action::Set(0)");
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.available_actions = available_actions;
+        self
+    }
+
+    pub fn default_target(mut self, default_target: usize) -> Self {
+        if default_target > self.max_duty_cycle_index {
+            panic!(
+                "The default_target must not be greater than max_duty_cycle_index,
+                   duty_cycles must have a Some value at the default_value index."
+            );
+        }
+        self.default_target = default_target;
+        self
+    }
+
+    pub fn duty_cycles(mut self, duty_cycles: [Option<u32>; 8]) -> Self {
+        let max_duty_cycle_index = Device::get_max_duty_cycle_index(&duty_cycles);
+        if self.default_target > max_duty_cycle_index || self.target > max_duty_cycle_index {
+            panic!(
+                "The default_target and target must not be greater than max_duty_cycle_index,
+                   duty_cycles must have a Some value at the default_value index."
+            );
+        }
+        self.duty_cycles = duty_cycles;
+        self.max_duty_cycle_index = max_duty_cycle_index;
+        self
+    }
+
+    pub fn target(mut self, target: usize) -> Self {
+        if target > self.max_duty_cycle_index {
+            panic!(
+                "The target: {}, must not be greater than max_duty_cycle_index: {},
+duty_cycles must have a Some value at the default_value index.",
+                target, self.max_duty_cycle_index
+            );
+        }
+        self.target = target;
+        self
+    }
+
+    pub fn freq_Hz(mut self, freq: u32) -> Self {
+        self.freq_Hz = freq;
+        self
+    }
+
+    pub fn device_group(mut self, device_group: Option<DeviceGroup>) -> Self {
+        self.device_group = device_group;
+        self
+    }
+
+    pub fn reversed(mut self, reversed: bool) -> Self {
+        self.reversed = reversed;
+        self
+    }
+
+    pub fn updated(mut self, updated: bool) -> Self {
+        self.updated = updated;
+        self
+    }
+
+    pub fn behavior(mut self, behavior: Behavior) -> Self {
+        self.behavior = behavior;
+        self
+    }
+
+    fn get_max_duty_cycle_index(duty_cycles: &[Option<u32>; 8]) -> usize {
+        let mut some_count = 0;
+        let mut found_none = false;
+        for dc in duty_cycles {
+            if dc.is_some() {
+                some_count += 1;
+                if found_none {
+                    panic!("Within the array of duty_cycles, there mustn't be a Some value that follows a None.");
+                }
+            } else {
+                found_none = true;
+            }
+        }
+        some_count - 1
     }
 
     pub fn from_json(json: &String) -> Result<Self, &'static str> {
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
             Ok(d) => Ok(d),
-            Err(e) => {
-                Err("Could not convert Device to json")
-            }
+            Err(e) => Err("Could not convert Device to json"),
         }
     }
 
@@ -359,30 +462,29 @@ impl Device {
         match action {
             A::On => {
                 if !self.available_actions.contains(&action) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
                 self.target = self.default_target;
             }
             A::Off => {
                 if !self.available_actions.contains(&action) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
                 self.target = 0;
             }
             A::Up(v) => {
                 if !self.available_actions.contains(&Action::Up(None)) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
                 let amount = match v {
                     Some(a) => a,
                     None => 1,
                 };
-                self.target = (self.target + amount)
-                    .min(self.get_max_usable_duty_cycle_index());
+                self.target = (self.target + amount).min(self.max_duty_cycle_index);
             }
             A::Down(v) => {
                 if !self.available_actions.contains(&Action::Down(None)) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
                 let amount = match v {
                     Some(a) => a,
@@ -396,27 +498,30 @@ impl Device {
             }
             A::Min => {
                 if !self.available_actions.contains(&action) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
                 self.target = 1;
             }
             A::Max => {
                 if !self.available_actions.contains(&action) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
-                self.target = self.get_max_usable_duty_cycle_index();
+                self.target = self.max_duty_cycle_index;
             }
             A::Reverse => {
                 if !self.available_actions.contains(&action) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
                 self.reversed = !self.reversed;
             }
             A::Set(v) => {
                 if !self.available_actions.contains(&Action::Set(0)) {
-                    panic!("Action not available fror device");
+                    return Err("Action not available for device.");
                 }
-                self.target = v.min(self.get_max_usable_duty_cycle_index()); 
+                if v > self.max_duty_cycle_index {
+                    return Err("You attempted to set the target, to something larger than the max duty cycle index");
+                }
+                self.target = v.min(self.max_duty_cycle_index);
             }
         }
         self.action = action;
@@ -425,7 +530,10 @@ impl Device {
     }
 
     pub fn get_duty_cycle(&self) -> u32 {
-        self.duty_cycles[self.target].unwrap()
+        match self.duty_cycles[self.target] {
+            Some(ds) => ds,
+            None => self.duty_cycles[self.max_duty_cycle_index].expect("Something went very wrong! Somehow self.max_duty_cycle_index is larger than the index of the last Some value in self.duty_cycles.")
+        }
     }
 }
 
@@ -446,90 +554,526 @@ impl Devices {
 
     pub fn clone(&self) -> Self {
         Self {
-            devices: Arc::clone(&self.devices)
+            devices: Arc::clone(&self.devices),
         }
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn action_synonyms_count() {
+        use std::mem;
+        assert_eq!(mem::variant_count::<Action>(), ACTION_SYNONYMS.len());
+    }
+
+    #[test]
+    fn action_same_variant() {
+        let one = Action::On;
+        let two = Action::On;
+        assert!(one.same_variant(&two));
+
+        let three = Action::Up(None);
+        let four = Action::Up(Some(3));
+        assert!(three.same_variant(&four));
+
+        let five = Action::Set(2);
+        let six = Action::Set(6);
+        assert!(five.same_variant(&six));
+
+        assert!(!three.same_variant(&six));
+    }
+
+    #[test]
+    fn action_from_str() {
+        let text = "on";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::On));
+
+        let text = "off";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Off));
+
+        let text = "up";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Up(Some(5))));
+
+        let text = "up";
+        let val = None;
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Up(None)));
+
+        let text = "down";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Down(Some(5))));
+
+        let text = "down";
+        let val = None;
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Down(None)));
+
+        let text = "minimum";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Min));
+
+        let text = "maximum";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Max));
+
+        let text = "reverse";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Reverse));
+
+        let text = "set";
+        let val = Some(5);
+        let actual = Action::from_str(text, val);
+        assert_eq!(actual, Ok(Action::Set(5)));
+
+        let text = "set";
+        let val = None;
+        let actual = Action::from_str(text, val);
+        assert!(actual.is_err());
+
+        let text = "not_anything";
+        let val = None;
+        let actual = Action::from_str(text, val);
+        assert!(actual.is_err());
+    }
+
+    #[test]
+    fn action_from_uuid() {
+        let uuid = 0x928e9b929939486b998d69613f89a9a6;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::On));
+
+        let uuid = 0x13df417d74d2443b87e3de60557b75b8;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Off));
+
+        let uuid = 0xbc6c6eeba0ba40e0a57ff5186d4350ce;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Up(Some(5))));
+
+        let uuid = 0xbc6c6eeba0ba40e0a57ff5186d4350ce;
+        let val = None;
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Up(None)));
+
+        let uuid = 0x62865402c86245eea282d4f2ca8fd51b;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Down(Some(5))));
+
+        let uuid = 0x62865402c86245eea282d4f2ca8fd51b;
+        let val = None;
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Down(None)));
+
+        let uuid = 0x4aad1b26ea9b455190d0d917102b7f36;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Min));
+
+        let uuid = 0x4ffb631fa4ba4fb5a189f7a3bb9dfa01;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Max));
+
+        let uuid = 0x1a8a1df0523e4acb8390b872329a9ca7;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Reverse));
+
+        let uuid = 0x2a4fae8107134e1fa8187ac56e4f13e4;
+        let val = Some(5);
+        let actual = Action::from_u128(uuid, val);
+        assert_eq!(actual, Ok(Action::Set(5)));
+
+        let uuid = 0x2a4fae8107134e1fa8187ac56e4f13e4;
+        let val = None;
+        let actual = Action::from_u128(uuid, val);
+        assert!(actual.is_err());
+
+        let uuid = 0x1234;
+        let val = None;
+        let actual = Action::from_u128(uuid, val);
+        assert!(actual.is_err());
+    }
+
+    #[test]
+    fn action_to_str() {
+        assert_eq!(Action::On.to_str(), "on");
+
+        assert_eq!(Action::Off.to_str(), "off");
+
+        assert_eq!(Action::Up(Some(3)).to_str(), "up");
+
+        assert_eq!(Action::Up(None).to_str(), "up");
+
+        assert_eq!(Action::Down(Some(2)).to_str(), "down");
+
+        assert_eq!(Action::Min.to_str(), "minimum");
+
+        assert_eq!(Action::Max.to_str(), "maximum");
+
+        assert_eq!(Action::Reverse.to_str(), "reverse");
+
+        assert_eq!(Action::Set(3).to_str(), "set");
+    }
+
+    #[test]
+    fn action_to_uuid() {
+        assert_eq!(
+            Action::On.to_uuid(),
+            Uuid::from_u128(0x928e9b929939486b998d69613f89a9a6)
+        );
+
+        assert_eq!(
+            Action::Off.to_uuid(),
+            Uuid::from_u128(0x13df417d74d2443b87e3de60557b75b8)
+        );
+
+        assert_eq!(
+            Action::Up(Some(3)).to_uuid(),
+            Uuid::from_u128(0xbc6c6eeba0ba40e0a57ff5186d4350ce)
+        );
+
+        assert_eq!(
+            Action::Up(None).to_uuid(),
+            Uuid::from_u128(0xbc6c6eeba0ba40e0a57ff5186d4350ce)
+        );
+
+        assert_eq!(
+            Action::Down(Some(3)).to_uuid(),
+            Uuid::from_u128(0x62865402c86245eea282d4f2ca8fd51b)
+        );
+
+        assert_eq!(
+            Action::Down(None).to_uuid(),
+            Uuid::from_u128(0x62865402c86245eea282d4f2ca8fd51b)
+        );
+
+        assert_eq!(
+            Action::Min.to_uuid(),
+            Uuid::from_u128(0x4aad1b26ea9b455190d0d917102b7f36)
+        );
+
+        assert_eq!(
+            Action::Max.to_uuid(),
+            Uuid::from_u128(0x4ffb631fa4ba4fb5a189f7a3bb9dfa01)
+        );
+
+        assert_eq!(
+            Action::Reverse.to_uuid(),
+            Uuid::from_u128(0x1a8a1df0523e4acb8390b872329a9ca7)
+        );
+
+        assert_eq!(
+            Action::Set(3).to_uuid(),
+            Uuid::from_u128(0x2a4fae8107134e1fa8187ac56e4f13e4)
+        );
+    }
+
+    #[test]
+    fn action_get_value() {
+        let actual = Action::On.get_value();
+        let expected = None;
+        assert_eq!(actual, expected);
+
+        let actual = Action::Up(Some(2)).get_value();
+        let expected = Some(2);
+        assert_eq!(actual, expected);
+
+        let actual = Action::Up(None).get_value();
+        let expected = None;
+        assert_eq!(actual, expected);
+
+        let actual = Action::Down(Some(2)).get_value();
+        let expected = Some(2);
+        assert_eq!(actual, expected);
+
+        let actual = Action::Down(None).get_value();
+        let expected = None;
+        assert_eq!(actual, expected);
+
+        let actual = Action::Set(4).get_value();
+        let expected = Some(4);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn device_new() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string());
+        assert_eq!(device.uuid, Uuid::from_u128(0x12345));
+        assert_eq!(device.name, String::from("name"));
+        assert_eq!(device.action, Action::Off);
+        assert_eq!(
+            device.available_actions,
+            Vec::from([
+                Action::On,
+                Action::Off,
+                Action::Up(None),
+                Action::Down(None),
+                Action::Min,
+                Action::Max,
+                Action::Set(0)
+            ])
+        );
+        assert_eq!(device.default_target, 3);
+        assert_eq!(
+            device.duty_cycles,
+            [
+                Some(0),
+                Some(2),
+                Some(4),
+                Some(8),
+                Some(16),
+                Some(32),
+                Some(64),
+                Some(96)
+            ]
+        );
+        assert_eq!(device.max_duty_cycle_index, 7);
+        assert_eq!(device.target, 0);
+        assert_eq!(device.freq_Hz, 100);
+        assert_eq!(device.device_group, None);
+        assert_eq!(device.reversed, false);
+        assert_eq!(device.updated, true);
+        assert_eq!(device.behavior, Behavior::Slider);
+    }
+
+    #[test]
+    fn device_action() {
+        let device =
+            Device::new(Uuid::from_u128(0x12345), "name".to_string()).action(Action::Set(4));
+        assert_eq!(device.action, Action::Set(4));
+    }
+
+    #[test]
+    fn device_available_actions() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .available_actions(vec![Action::On, Action::Up(None), Action::Set(0)]);
+        assert_eq!(
+            device.available_actions,
+            vec![Action::On, Action::Up(None), Action::Set(0)]
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_available_actions_panic_up() {
+        // should panic if Up, Down, and Set don't have the right values
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .available_actions(vec![Action::On, Action::Up(Some(0))]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_available_actions_panic_down() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .available_actions(vec![Action::On, Action::Down(Some(0))]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_available_actions_panic_set() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .available_actions(vec![Action::On, Action::Set(1)]);
+    }
+
+    #[test]
+    fn device_default_target() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).default_target(5);
+        assert_eq!(device.default_target, 5);
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_default_target_panic() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
+            .default_target(5);
+    }
+
+    #[test]
+    fn device_duty_cycles() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).duty_cycles([
+            Some(0),
+            Some(1),
+            Some(3),
+            Some(4),
+            None,
+            None,
+            None,
+            None,
+        ]);
+        assert_eq!(device.max_duty_cycle_index, 3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_duty_cycles_default_target_panic() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).duty_cycles([
+            Some(0),
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_duty_cycles_target_panic() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .target(6)
+            .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None]);
+    }
+
+    #[test]
+    fn device_target() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
+            .target(2);
+        assert_eq!(device.target, 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn device_target_panic() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
+            .target(6);
+    }
+
+    #[test]
+    fn device_freq_hz() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).freq_Hz(88);
+        assert_eq!(device.freq_Hz, 88);
+    }
+
+    #[test]
+    fn device_device_group_some() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
+            .device_group(Some(DeviceGroup::Light));
+        assert_eq!(device.device_group, Some(DeviceGroup::Light));
+    }
+
+    #[test]
+    fn device_device_group_none() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).device_group(None);
+        assert_eq!(device.device_group, None);
+    }
+
+    #[test]
+    fn device_reversed() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).reversed(true);
+        assert!(device.reversed);
+    }
+
+    #[test]
+    fn device_updated() {
+        let device = Device::new(Uuid::from_u128(0x12345), "name".to_string()).updated(true);
+        assert!(device.updated);
+    }
+
+    #[test]
+    fn device_behavior() {
+        let device =
+            Device::new(Uuid::from_u128(0x12345), "name".to_string()).behavior(Behavior::Slider);
+        assert_eq!(device.behavior, Behavior::Slider);
+    }
+
+    #[test]
     fn device_to_json() {
-        use Action::*;
-        let device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 3,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 2,
-            freq_kHz: 10,
-        };
+        let device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .action(Action::Up(Some(3)));
 
         let jsoned = device.to_json();
 
-        let actual =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"duty_cycles\":[0,10,45,60,80,90],\"target\":2,\"freq_kHz\":10}";
+        let actual = "{\"uuid\":\"f1d34301-c916-42a8-8c7c-274828177649\",\"name\":\"Device1\",\"action\":{\"Up\":3},\"available_actions\":[\"On\",\"Off\",{\"Up\":null},{\"Down\":null},\"Min\",\"Max\",{\"Set\":0}],\"default_target\":3,\"duty_cycles\":[0,2,4,8,16,32,64,96],\"max_duty_cycle_index\":7,\"target\":0,\"freq_Hz\":100,\"device_group\":null,\"reversed\":false,\"updated\":true,\"behavior\":\"Slider\"}";
 
         assert_eq!(jsoned, actual);
     }
 
     #[test]
     fn device_from_json() {
-        use Action::*;
-        let device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 3,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 2,
-            freq_kHz: 10,
-        };
+        let device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .action(Action::Up(Some(3)));
 
-        let json =  "{\"name\":\"Device1\",\"action\":\"Off\",\"available_actions\":[\"On\",\"Off\",\"Min\",\"Max\"],\"default_target\":3,\"duty_cycles\":[0,10,45,60,80,90],\"target\":2,\"freq_kHz\":10}";
+        let json_text = "{\"uuid\":\"f1d34301-c916-42a8-8c7c-274828177649\",\"name\":\"Device1\",\"action\":{\"Up\":3},\"available_actions\":[\"On\",\"Off\",{\"Up\":null},{\"Down\":null},\"Min\",\"Max\",{\"Set\":0}],\"default_target\":3,\"duty_cycles\":[0,2,4,8,16,32,64,96],\"max_duty_cycle_index\":7,\"target\":0,\"freq_Hz\":100,\"device_group\":null,\"reversed\":false,\"updated\":true,\"behavior\":\"Slider\"}";
 
-        let actual = Device::from_json(&json.to_string());
+        let actual = Device::from_json(&json_text.to_string());
 
         assert_eq!(device, actual.unwrap());
     }
 
     #[test]
-    fn take_action_on() {
+    fn device_take_action_action_missing() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 3,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 2,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .available_actions(vec![])
+        .target(2)
+        .updated(false);
 
-        device.take_action(On, None);
+        let err = device.take_action(On);
+
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn device_take_action_on() {
+        use Action::*;
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(2)
+        .updated(false);
+
+        let _ = device.take_action(On);
 
         assert_eq!(device.target, 3);
-        assert_eq!(device.get_duty_cycle(), 60);
+        assert_eq!(device.get_duty_cycle(), 8);
         assert_eq!(device.action, On);
     }
 
     #[test]
-    fn take_action_off() {
+    fn device_take_action_off() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::On,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 3,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 2,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(2)
+        .action(On)
+        .updated(false);
 
-        device.take_action(Off, None);
+        let _ = device.take_action(Off);
 
         assert_eq!(device.target, 0);
         assert_eq!(device.get_duty_cycle(), 0);
@@ -537,171 +1081,235 @@ mod tests {
     }
 
     #[test]
-    fn take_action_up() {
+    fn device_take_action_up_none() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 5,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 2,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(2)
+        .updated(false);
 
-        device.take_action(Up, None);
+        let _ = device.take_action(Up(None));
 
         assert_eq!(device.target, 3);
-        assert_eq!(device.get_duty_cycle(), 60);
-        assert_eq!(device.action, Up);
+        assert_eq!(device.get_duty_cycle(), 8);
+        assert_eq!(device.action, Up(None));
     }
 
     #[test]
-    fn take_action_up_already_max() {
+    fn device_take_action_up_some() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 3,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 5,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(2)
+        .updated(false);
 
-        device.take_action(Up, None);
-
-        assert_eq!(device.target, 5);
-        assert_eq!(device.get_duty_cycle(), 90);
-        assert_eq!(device.action, Up);
-    }
-
-    #[test]
-    fn take_action_down() {
-        use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 2,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 5,
-            freq_kHz: 110,
-        };
-
-        device.take_action(Down, None);
+        let _ = device.take_action(Up(Some(2)));
 
         assert_eq!(device.target, 4);
-        assert_eq!(device.get_duty_cycle(), 80);
-        assert_eq!(device.action, Down);
+        assert_eq!(device.get_duty_cycle(), 16);
+        assert_eq!(device.action, Up(Some(2)));
     }
 
     #[test]
-    fn take_action_down_already_down() {
+    fn device_take_action_up_already_max() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::On,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 2,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 0,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(7)
+        .updated(false);
 
-        device.take_action(Down, None);
+        let _ = device.take_action(Up(None));
+
+        assert_eq!(device.target, 7);
+        assert_eq!(device.get_duty_cycle(), 96);
+        assert_eq!(device.action, Up(None));
+    }
+
+    #[test]
+    fn device_take_action_down_none() {
+        use Action::*;
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(2)
+        .updated(false);
+
+        let _ = device.take_action(Down(None));
+
+        assert_eq!(device.target, 1);
+        assert_eq!(device.get_duty_cycle(), 2);
+        assert_eq!(device.action, Down(None));
+    }
+
+    #[test]
+    fn device_take_action_down_some() {
+        use Action::*;
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(2)
+        .updated(false);
+
+        let _ = device.take_action(Down(Some(2)));
 
         assert_eq!(device.target, 0);
         assert_eq!(device.get_duty_cycle(), 0);
-        assert_eq!(device.action, Down);
+        assert_eq!(device.action, Down(Some(2)));
     }
 
     #[test]
-    fn take_action_min() {
+    fn device_take_action_down_already_off() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 2,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 3,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(0)
+        .updated(false);
 
-        device.take_action(Min, None);
+        let _ = device.take_action(Down(None));
+
+        assert_eq!(device.target, 0);
+        assert_eq!(device.get_duty_cycle(), 0);
+        assert_eq!(device.action, Down(None));
+    }
+
+    #[test]
+    fn device_take_action_min() {
+        use Action::*;
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(5)
+        .updated(false);
+
+        let _ = device.take_action(Min);
 
         assert_eq!(device.target, 1);
-        assert_eq!(device.get_duty_cycle(), 10);
+        assert_eq!(device.get_duty_cycle(), 2);
         assert_eq!(device.action, Min);
     }
 
     #[test]
-    fn take_action_max() {
+    fn device_take_action_max() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 2,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 3,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .target(5)
+        .updated(false);
 
-        device.take_action(Max, None);
+        let _ = device.take_action(Max);
 
-        assert_eq!(device.target, 5);
-        assert_eq!(device.get_duty_cycle(), 90);
+        assert_eq!(device.target, 7);
+        assert_eq!(device.get_duty_cycle(), 96);
         assert_eq!(device.action, Max);
     }
 
     #[test]
-    fn take_action_set() {
+    fn device_take_action_reverse() {
         use Action::*;
-        let mut device = Device {
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 2,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 3,
-            freq_kHz: 110,
-        };
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .available_actions(vec![On, Off, Reverse])
+        .updated(false);
 
-        device.take_action(Set, Some(5));
-
-        assert_eq!(device.target, 5);
-        assert_eq!(device.get_duty_cycle(), 90);
-        assert_eq!(device.action, Set);
+        let _ = device.take_action(Reverse);
+        dbg!(&device.reversed);
+        device.reversed = !device.reversed;
+        dbg!(&device.reversed);
+        assert!(!device.reversed);
+        assert_eq!(device.action, Reverse);
     }
 
     #[test]
-    fn take_action_set_high() {
+    fn device_take_action_set() {
         use Action::*;
-        let mut device = Device {
-            uuid: Uuid,
-            name: String::from("Device1"),
-            action: Action::Off,
-            available_actions: Vec::from([On, Off, Min, Max]),
-            default_target: 2,
-            duty_cycles: [0, 10, 45, 60, 80, 90],
-            target: 3,
-            freq_kHz: 110,
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .updated(false);
+        let _ = device.take_action(Set(3));
+        assert_eq!(device.target, 3);
+        assert_eq!(device.get_duty_cycle(), 8);
+        assert_eq!(device.action, Set(3));
+
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
+        .updated(false);
+        let output = device.take_action(Set(5));
+        assert!(output.is_err());
+    }
+
+    #[test]
+    fn device_take_action_get_duty_cycle() {
+        use Action::*;
+        let mut device = Device::new(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .updated(false)
+        .target(3);
+
+        assert_eq!(device.get_duty_cycle(), 8);
+    }
+
+    #[test]
+    fn devices_append() {
+        let mut lights1 = Devices {
+            devices: Arc::new(Mutex::new(Vec::from([
+                Device::new(
+                    Uuid::from_u128(0x584507902e74f44b67902b90775abda),
+                    "bedroom light".to_string(),
+                ),
+                Device::new(
+                    Uuid::from_u128(0x36bc0fe1b00742809ec6b36c8bc98537),
+                    "kitchen light".to_string(),
+                ),
+            ]))),
         };
+        let mut lights2 = Devices {
+            devices: Arc::new(Mutex::new(Vec::from([
+                Device::new(
+                    Uuid::from_u128(0xad87d775f9fd4bc29f06c47937f6df4a),
+                    "counter light".to_string(),
+                ),
+                Device::new(
+                    Uuid::from_u128(0xc252b58ab7f046fc9fda00f9947904df),
+                    "outside light".to_string(),
+                ),
+            ]))),
+        };
+        lights1.append(&mut lights2);
 
-        device.take_action(Set, Some(6));
+        assert_eq!(lights1.devices.lock().unwrap().len(), 4);
 
-        assert_eq!(device.target, 5);
-        assert_eq!(device.get_duty_cycle(), 90);
-        assert_eq!(device.action, Set);
+        let names = lights1
+            .devices
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|d| d.name.clone())
+            .collect::<Vec<String>>();
+        assert!(names.contains(&"bedroom light".to_string()));
+        assert!(names.contains(&"kitchen light".to_string()));
+        assert!(names.contains(&"counter light".to_string()));
+        assert!(names.contains(&"outside light".to_string()));
     }
 }
-
-// On,
-//     Off,
-//     Up,
-//     Down,
-//     Min,
-//     Max,
-//     Set,*/
