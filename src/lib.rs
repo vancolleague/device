@@ -1,7 +1,5 @@
 #![feature(variant_count)]
 
-use std::collections::HashMap;
-use std::default::Default;
 use std::mem::discriminant;
 use std::sync::{Arc, Mutex};
 
@@ -265,35 +263,6 @@ pub struct Device {
     pub behavior: Behavior,
 }
 
-/*
-impl Default for Device {
-    fn default() -> Self {
-        Self {
-            uuid: Uuid::from_u128(0x0),
-            name: "".to_string(),
-            action: Action::Off,
-            available_actions: Vec::from([
-                Action::On,
-                Action::Off,
-                Action::Up(None),
-                Action::Down(None),
-                Action::Min,
-                Action::Max,
-                Action::Set(0),
-            ]),
-            default_target: 3,
-            duty_cycles: [Some(0), Some(2), Some(4), Some(8), Some(16), Some(32), Some(64), Some(96)],
-            target: 0,
-            freq_Hz: 100,
-            device_group: None,
-            reversed: false,
-            updated: true,
-            behavior: Behavior::Slider,
-        }
-    }
-}
-*/
-
 impl Device {
     /// Constructs a new 'Device' with the given 'uuid' and 'name'.
     /// All other properties are optional and will be filled with defaults unless relevent
@@ -533,6 +502,13 @@ duty_cycles must have a Some value at the default_value index.",
         self.updated
     }
 
+    /// Gets the updated duty cycle
+    ///
+    /// Given the devices 'duty_cycle's, get the 'target's duty cycle
+    /// Said duty cycle is scaled by 'max_duty_cycle' which is to be entered
+    /// as a percent where the max is , so 0 through 100 incluseve.
+
+    // TODO: needs testing
     pub fn get_and_update_duty_cycle(&mut self, max_duty_cycle: &u32) -> u32 {
         let ds = match self.duty_cycles[self.target] {
             Some(ds) => ds,
@@ -878,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "If Action::Up is an an available_action")]
     fn device_available_actions_panic_up() {
         // should panic if Up, Down, and Set don't have the right values
         let _device = Device::new(Uuid::from_u128(0x12345), "name".to_string())
@@ -1064,7 +1040,7 @@ mod tests {
         let _ = device.take_action(On);
 
         assert_eq!(device.target, 3);
-        assert_eq!(device.get_and_update_duty_cycle(255), 8 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 8 * 255 / 100);
         assert_eq!(device.action, On);
     }
 
@@ -1082,7 +1058,7 @@ mod tests {
         let _ = device.take_action(Off);
 
         assert_eq!(device.target, 0);
-        assert_eq!(device.get_and_update_duty_cycle(255), 0);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 0);
         assert_eq!(device.action, Off);
     }
 
@@ -1099,7 +1075,7 @@ mod tests {
         let _ = device.take_action(Up(None));
 
         assert_eq!(device.target, 3);
-        assert_eq!(device.get_and_update_duty_cycle(255), 8 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 8 * 255 / 100);
         assert_eq!(device.action, Up(None));
     }
 
@@ -1116,7 +1092,7 @@ mod tests {
         let _ = device.take_action(Up(Some(2)));
 
         assert_eq!(device.target, 4);
-        assert_eq!(device.get_and_update_duty_cycle(255), 16 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 16 * 255 / 100);
         assert_eq!(device.action, Up(Some(2)));
     }
 
@@ -1133,7 +1109,7 @@ mod tests {
         let _ = device.take_action(Up(None));
 
         assert_eq!(device.target, 7);
-        assert_eq!(device.get_and_update_duty_cycle(255), 96 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 96 * 255 / 100);
         assert_eq!(device.action, Up(None));
     }
 
@@ -1150,7 +1126,7 @@ mod tests {
         let _ = device.take_action(Down(None));
 
         assert_eq!(device.target, 1);
-        assert_eq!(device.get_and_update_duty_cycle(255), 2 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 2 * 255 / 100);
         assert_eq!(device.action, Down(None));
     }
 
@@ -1167,7 +1143,7 @@ mod tests {
         let _ = device.take_action(Down(Some(2)));
 
         assert_eq!(device.target, 0);
-        assert_eq!(device.get_and_update_duty_cycle(255), 0);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 0);
         assert_eq!(device.action, Down(Some(2)));
     }
 
@@ -1184,7 +1160,7 @@ mod tests {
         let _ = device.take_action(Down(None));
 
         assert_eq!(device.target, 0);
-        assert_eq!(device.get_and_update_duty_cycle(255), 0);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 0);
         assert_eq!(device.action, Down(None));
     }
 
@@ -1201,7 +1177,7 @@ mod tests {
         let _ = device.take_action(Min);
 
         assert_eq!(device.target, 1);
-        assert_eq!(device.get_and_update_duty_cycle(255), 2 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 2 * 255 / 100);
         assert_eq!(device.action, Min);
     }
 
@@ -1218,7 +1194,7 @@ mod tests {
         let _ = device.take_action(Max);
 
         assert_eq!(device.target, 7);
-        assert_eq!(device.get_and_update_duty_cycle(255), 96 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 96 * 255 / 100);
         assert_eq!(device.action, Max);
     }
 
@@ -1250,7 +1226,7 @@ mod tests {
         .updated(false);
         let _ = device.take_action(Set(3));
         assert_eq!(device.target, 3);
-        assert_eq!(device.get_and_update_duty_cycle(255), 8 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 8 * 255 / 100);
         assert_eq!(device.action, Set(3));
 
         let mut device = Device::new(
@@ -1273,7 +1249,7 @@ mod tests {
         .updated(false)
         .target(3);
 
-        assert_eq!(device.get_and_update_duty_cycle(255), 8 * 255 / 100);
+        assert_eq!(device.get_and_update_duty_cycle(&255), 8 * 255 / 100);
     }
 
     #[test]
@@ -1287,8 +1263,8 @@ mod tests {
 
         assert!(device.needs_hardware_duty_cycle_update());
 
-        device.get_and_update_duty_cycle(255);
-        
+        device.get_and_update_duty_cycle(&255);
+
         assert!(!device.needs_hardware_duty_cycle_update());
 
         let _ = device.take_action(On);
