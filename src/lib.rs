@@ -32,10 +32,10 @@ pub enum Behavior {
     Ten,
 }
 
-struct DeviceSynonyms {
-    device_group: DeviceGroup,
-    name: &'static str,
-    uuid_number: u128,
+pub struct DeviceSynonyms {
+    pub device_group: DeviceGroup,
+    pub name: &'static str,
+    pub uuid_number: u128,
 }
 
 pub const DEVICE_GROUPS: [DeviceSynonyms; 2] = [
