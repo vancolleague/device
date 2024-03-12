@@ -32,6 +32,7 @@ pub enum Behavior {
     Ten,
 }
 
+#[derive(Debug)]
 pub struct DeviceSynonyms {
     pub device_group: DeviceGroup,
     pub name: &'static str,
@@ -57,6 +58,7 @@ pub enum DeviceGroup {
     Fan,
 }
 
+#[derive(Debug)]
 struct ActionSynonyms {
     action: Action,
     name: &'static str,
