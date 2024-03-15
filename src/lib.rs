@@ -1,36 +1,10 @@
 #![feature(variant_count)]
 
-use std::error::Error;
 use std::mem::discriminant;
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
-use serde_json;
 use uuid::Uuid;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub enum Behavior {
-    TwoWaySwitch,
-    ThreeWaySwitch,
-    FourWaySwitch,
-    FiveWaySwitch,
-    SixWaySwitch,
-    SevenWaySwitch,
-    EgithWaySwitch,
-    Slider,
-    ReversableSlider,
-    HVAC,
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-    Nine,
-    Ten,
-}
 
 #[derive(Debug)]
 pub struct DeviceSynonyms {
@@ -61,49 +35,49 @@ pub enum DeviceGroup {
 #[derive(Debug)]
 struct ActionSynonyms {
     action: Action,
-    name: &'static str,
+    text: &'static str,
     uuid_number: u128,
 }
 
 const ACTION_SYNONYMS: [ActionSynonyms; 8] = [
     ActionSynonyms {
         action: Action::On,
-        name: "on",
+        text: "on",
         uuid_number: 0x928e9b929939486b998d69613f89a9a6,
     },
     ActionSynonyms {
         action: Action::Off,
-        name: "off",
+        text: "off",
         uuid_number: 0x13df417d74d2443b87e3de60557b75b8,
     },
     ActionSynonyms {
         action: Action::Up(None),
-        name: "up",
+        text: "up",
         uuid_number: 0xbc6c6eeba0ba40e0a57ff5186d4350ce,
     },
     ActionSynonyms {
         action: Action::Down(None),
-        name: "down",
+        text: "down",
         uuid_number: 0x62865402c86245eea282d4f2ca8fd51b,
     },
     ActionSynonyms {
         action: Action::Min,
-        name: "minimum",
+        text: "minimum",
         uuid_number: 0x4aad1b26ea9b455190d0d917102b7f36,
     },
     ActionSynonyms {
         action: Action::Max,
-        name: "maximum",
+        text: "maximum",
         uuid_number: 0x4ffb631fa4ba4fb5a189f7a3bb9dfa01,
     },
     ActionSynonyms {
         action: Action::Reverse,
-        name: "reverse",
+        text: "reverse",
         uuid_number: 0x1a8a1df0523e4acb8390b872329a9ca7,
     },
     ActionSynonyms {
         action: Action::Set(0),
-        name: "set",
+        text: "set",
         uuid_number: 0x2a4fae8107134e1fa8187ac56e4f13e4,
     },
 ];
@@ -142,38 +116,36 @@ impl Action {
                     return Err("No target was given");
                 }
             }
-            name => {
-                for action in ACTION_SYNONYMS {
-                    if action.name == name {
-                        return Ok(action.action);
+            text => {
+                for synonym in ACTION_SYNONYMS {
+                    if synonym.text == text {
+                        return Ok(synonym.action);
                     }
                 }
             }
         }
-        Err("Bad Action name given")
+        Err("Bad Action text given")
     }
 
     pub fn from_u128(uuid_number: u128, target: Option<usize>) -> Result<Self, &'static str> {
         for action_synonym in ACTION_SYNONYMS {
             if action_synonym.uuid_number == uuid_number {
-                return Self::from_str(action_synonym.name, target);
+                return Self::from_str(action_synonym.text, target);
             }
         }
         Err("Bad Uuid number given, no associated action")
     }
 
     pub fn to_str(&self) -> &'static str {
-        use Action as A;
         for action_synonym in ACTION_SYNONYMS {
             if self.same_variant(&action_synonym.action) {
-                return action_synonym.name;
+                return action_synonym.text;
             }
         }
         ""
     }
 
     pub fn to_uuid(&self) -> Uuid {
-        use Action as A;
         for action_synonym in ACTION_SYNONYMS {
             if self.same_variant(&action_synonym.action) {
                 return Uuid::from_u128(action_synonym.uuid_number);
@@ -247,6 +219,7 @@ pub struct Device {
     /// The frequency that the PWM will operate at in Hz.
     ///
     /// Defaults to 1000. Can be set using 'with_freq_Hz'.
+    #[allow(non_snake_case)]
     pub freq_Hz: u32,
     /// The type of device, used for addressing groups of devices such as lights or fans.
     ///
@@ -267,7 +240,6 @@ pub struct Device {
     /// Defaults to 'true', this can be used to set initial configurations of underlying hardware.
     /// Can be set using 'with_updated'.
     updated: bool,
-    pub behavior: Behavior,
 }
 
 impl Device {
@@ -308,7 +280,6 @@ impl Device {
             device_group: None,
             reversed: false,
             updated: true,
-            behavior: Behavior::Slider,
         })
     }
 
@@ -402,21 +373,6 @@ duty_cycles must have a Some value at the default_value index.");
         Ok(self)
     }
 
-    fn reversed(mut self, reversed: bool) -> Result<Self, &'static str> {
-        self.reversed = reversed;
-        Ok(self)
-    }
-
-    fn updated(mut self, updated: bool) -> Result<Self, &'static str> {
-        self.updated = updated;
-        Ok(self)
-    }
-
-    pub fn behavior(mut self, behavior: Behavior) -> Result<Self, &'static str> {
-        self.behavior = behavior;
-        Ok(self)
-    }
-
     fn get_max_duty_cycle_index(duty_cycles: &[Option<u32>; 8]) -> Result<usize, &'static str> {
         let mut some_count = 0;
         let mut found_none = false;
@@ -437,7 +393,7 @@ duty_cycles must have a Some value at the default_value index.");
         let device: Result<Device, serde_json::Error> = serde_json::from_str(json);
         match device {
             Ok(d) => Ok(d),
-            Err(e) => Err("Could not convert Device to json"),
+            Err(_) => Err("Could not convert Device to json"),
         }
     }
 
@@ -857,7 +813,6 @@ mod tests {
         assert_eq!(device.device_group, None);
         assert_eq!(device.reversed, false);
         assert_eq!(device.updated, true);
-        assert_eq!(device.behavior, Behavior::Slider);
     }
 
     #[test]
@@ -1042,33 +997,6 @@ mod tests {
     }
 
     #[test]
-    fn device_reversed() {
-        let device = Device::build(Uuid::from_u128(0x12345), "name".to_string())
-            .unwrap()
-            .reversed(true)
-            .unwrap();
-        assert!(device.reversed);
-    }
-
-    #[test]
-    fn device_updated() {
-        let device = Device::build(Uuid::from_u128(0x12345), "name".to_string())
-            .unwrap()
-            .updated(true)
-            .unwrap();
-        assert!(device.updated);
-    }
-
-    #[test]
-    fn device_behavior() {
-        let device = Device::build(Uuid::from_u128(0x12345), "name".to_string())
-            .unwrap()
-            .behavior(Behavior::Slider)
-            .unwrap();
-        assert_eq!(device.behavior, Behavior::Slider);
-    }
-
-    #[test]
     fn device_to_json() {
         let device = Device::build(
             Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
@@ -1080,7 +1008,7 @@ mod tests {
 
         let jsoned = device.to_json();
 
-        let actual = "{\"uuid\":\"f1d34301-c916-42a8-8c7c-274828177649\",\"name\":\"Device1\",\"action\":{\"Up\":3},\"available_actions\":[\"On\",\"Off\",{\"Up\":null},{\"Down\":null},\"Min\",\"Max\",{\"Set\":0}],\"default_target\":3,\"duty_cycles\":[0,2,4,8,16,32,64,96],\"max_duty_cycle_index\":7,\"target\":0,\"freq_Hz\":100,\"device_group\":null,\"reversed\":false,\"updated\":true,\"behavior\":\"Slider\"}";
+        let actual = "{\"uuid\":\"f1d34301-c916-42a8-8c7c-274828177649\",\"name\":\"Device1\",\"action\":{\"Up\":3},\"available_actions\":[\"On\",\"Off\",{\"Up\":null},{\"Down\":null},\"Min\",\"Max\",{\"Set\":0}],\"default_target\":3,\"duty_cycles\":[0,2,4,8,16,32,64,96],\"max_duty_cycle_index\":7,\"target\":0,\"freq_Hz\":100,\"device_group\":null,\"reversed\":false,\"updated\":true}";
 
         assert_eq!(jsoned, actual);
     }
@@ -1095,7 +1023,7 @@ mod tests {
         .action(Action::Up(Some(3)))
         .unwrap();
 
-        let json_text = "{\"uuid\":\"f1d34301-c916-42a8-8c7c-274828177649\",\"name\":\"Device1\",\"action\":{\"Up\":3},\"available_actions\":[\"On\",\"Off\",{\"Up\":null},{\"Down\":null},\"Min\",\"Max\",{\"Set\":0}],\"default_target\":3,\"duty_cycles\":[0,2,4,8,16,32,64,96],\"max_duty_cycle_index\":7,\"target\":0,\"freq_Hz\":100,\"device_group\":null,\"reversed\":false,\"updated\":true,\"behavior\":\"Slider\"}";
+        let json_text = "{\"uuid\":\"f1d34301-c916-42a8-8c7c-274828177649\",\"name\":\"Device1\",\"action\":{\"Up\":3},\"available_actions\":[\"On\",\"Off\",{\"Up\":null},{\"Down\":null},\"Min\",\"Max\",{\"Set\":0}],\"default_target\":3,\"duty_cycles\":[0,2,4,8,16,32,64,96],\"max_duty_cycle_index\":7,\"target\":0,\"freq_Hz\":100,\"device_group\":null,\"reversed\":false,\"updated\":true}";
 
         let actual = Device::from_json(&json_text.to_string());
 
@@ -1113,8 +1041,6 @@ mod tests {
         .available_actions(vec![])
         .unwrap()
         .target(2)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let err = device.take_action(On);
@@ -1131,8 +1057,6 @@ mod tests {
         )
         .unwrap()
         .target(2)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(On);
@@ -1153,8 +1077,6 @@ mod tests {
         .target(2)
         .unwrap()
         .action(On)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Off);
@@ -1173,8 +1095,6 @@ mod tests {
         )
         .unwrap()
         .target(2)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Up(None));
@@ -1193,8 +1113,6 @@ mod tests {
         )
         .unwrap()
         .target(2)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Up(Some(2)));
@@ -1213,8 +1131,6 @@ mod tests {
         )
         .unwrap()
         .target(7)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Up(None));
@@ -1233,8 +1149,6 @@ mod tests {
         )
         .unwrap()
         .target(2)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Down(None));
@@ -1253,8 +1167,6 @@ mod tests {
         )
         .unwrap()
         .target(2)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Down(Some(2)));
@@ -1273,8 +1185,6 @@ mod tests {
         )
         .unwrap()
         .target(0)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Down(None));
@@ -1293,8 +1203,6 @@ mod tests {
         )
         .unwrap()
         .target(5)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Min);
@@ -1313,8 +1221,6 @@ mod tests {
         )
         .unwrap()
         .target(5)
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Max);
@@ -1333,14 +1239,10 @@ mod tests {
         )
         .unwrap()
         .available_actions(vec![On, Off, Reverse])
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Reverse);
-        dbg!(&device.reversed);
         device.reversed = !device.reversed;
-        dbg!(&device.reversed);
         assert!(!device.reversed);
         assert_eq!(device.action, Reverse);
     }
@@ -1352,8 +1254,6 @@ mod tests {
             Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
             String::from("Device1"),
         )
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let _ = device.take_action(Set(3));
@@ -1367,8 +1267,6 @@ mod tests {
         )
         .unwrap()
         .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
-        .unwrap()
-        .updated(false)
         .unwrap();
 
         let output = device.take_action(Set(5));
@@ -1382,8 +1280,6 @@ mod tests {
             Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
             String::from("Device1"),
         )
-        .unwrap()
-        .updated(false)
         .unwrap()
         .target(3)
         .unwrap();
