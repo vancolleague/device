@@ -110,11 +110,15 @@ impl Action {
                 return Ok(Action::Down(target));
             }
             "set" => {
-                if target.is_some() {
+                match target {
+                    Some(t) => return Ok(Action::Set(t)),
+                    None => return Err("No target was given"),
+                }
+                /*if target.is_some() {
                     return Ok(Action::Set(target.unwrap()));
                 } else {
                     return Err("No target was given");
-                }
+                }*/
             }
             text => {
                 for synonym in ACTION_SYNONYMS {
