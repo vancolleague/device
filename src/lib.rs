@@ -377,6 +377,22 @@ duty_cycles must have a Some value at the default_value index.");
         Ok(self)
     }
 
+    pub fn target_next_duty_cycle(&mut self) {
+        if self.target < self.max_duty_cycle_index {
+            self.target = self.target + 1;
+        } else {
+            self.target = 0;
+        }
+    }
+
+    pub fn target_last_duty_cycle(&mut self) {
+        if self.target > 0 {
+            self.target = self.target - 1;
+        } else {
+            self.target = self.max_duty_cycle_index;
+        }
+    }
+
     fn get_max_duty_cycle_index(duty_cycles: &[Option<u32>; 8]) -> Result<usize, &'static str> {
         let mut some_count = 0;
         let mut found_none = false;
@@ -1358,5 +1374,51 @@ mod tests {
         assert!(names.contains(&"kitchen light".to_string()));
         assert!(names.contains(&"counter light".to_string()));
         assert!(names.contains(&"outside light".to_string()));
+    }
+    
+    #[test]
+    fn device_target_next_duty_cycle() {
+        use Action::*;
+        let mut device = Device::build(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .unwrap()
+        .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
+        .unwrap();
+
+        let _ = device.take_action(Set(0));
+        assert_eq!(device.get_target(), 0);
+        device.target_next_duty_cycle();
+        assert_eq!(device.get_target(), 1);
+        device.target_next_duty_cycle();
+        assert_eq!(device.get_target(), 2);
+        device.target_next_duty_cycle();
+        assert_eq!(device.get_target(), 3);
+        device.target_next_duty_cycle();
+        assert_eq!(device.get_target(), 0);
+    }
+    
+    #[test]
+    fn device_target_last_duty_cycle() {
+        use Action::*;
+        let mut device = Device::build(
+            Uuid::from_u128(0xf1d34301c91642a88c7c274828177649),
+            String::from("Device1"),
+        )
+        .unwrap()
+        .duty_cycles([Some(0), Some(1), Some(3), Some(4), None, None, None, None])
+        .unwrap();
+
+        let _ = device.take_action(Set(0));
+        assert_eq!(device.get_target(), 0);
+        device.target_last_duty_cycle();
+        assert_eq!(device.get_target(), 3);
+        device.target_last_duty_cycle();
+        assert_eq!(device.get_target(), 2);
+        device.target_last_duty_cycle();
+        assert_eq!(device.get_target(), 1);
+        device.target_last_duty_cycle();
+        assert_eq!(device.get_target(), 0);
     }
 }
